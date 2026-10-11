@@ -77,10 +77,17 @@ async function callGemini(messages, images, json, maxTokens) {
     if (r.status === 401 || r.status === 403) return [500, { code: "no_key", message: "Gemini key was rejected: " + lastMsg }];
     // model missing/retired, or no free quota for this model -> try the next one
     const modelProblem = r.status === 404 || /not found|not supported|is not available|deprecated|limit: 0|free_tier/i.test(lastMsg);
+    // Google is overloaded on this model ("high demand" / 503 / 500): move on to the next model
+    const busy = r.status === 503 || r.status === 500 || r.status === 504 || /high demand|overloaded|unavailable|try again later/i.test(lastMsg);
+    if (busy) { if (goodModel === model) goodModel = null; await new Promise(res => setTimeout(res, 400)); continue; }
     if (!modelProblem && r.status !== 429) break;
     if (r.status === 429 && !/limit: 0|free_tier/i.test(lastMsg)) return [429, { code: "rate_limited", message: lastMsg }];
   }
-  if (!r.ok) return [502, { code: "upstream_error", message: lastMsg }];
+  if (!r.ok) {
+    if (/high demand|overloaded|unavailable|try again later/i.test(lastMsg) || r.status === 503)
+      return [503, { code: "upstream_error", message: "Google's free AI is busy right now. Wait 30 seconds and try again." }];
+    return [502, { code: "upstream_error", message: lastMsg }];
+  }
   const cand = (data.candidates || [])[0] || {};
   const text = (cand.content?.parts || []).map(p => p.text || "").join("");
   if (!text && cand.finishReason === "SAFETY") return [422, { code: "refused", message: "Blocked by safety filter" }];
