@@ -1761,10 +1761,10 @@ function aiErr(e){
     image_rejected:"That photo couldn't be opened. Try taking it again, or save it as a JPG first.",
     images_unavailable:"This Claude app can't send photos to the AI yet. Open Chomp on claude.ai in Safari or Chrome, or use Describe.",
     invalid_json:"The estimate came back garbled. Tap the button again.",
-    refused:"Claude couldn't estimate that. Try describing it differently.",
+    refused:"The AI couldn't estimate that. Try describing it differently.",
     prompt_too_large:"That description is too long. Shorten it.",
     cancelled:"",
-  })[c] ?? "Couldn't reach Claude. Try again.";
+  })[c] ?? ("Couldn't reach the AI. Try again." + (e && e.message ? " (" + String(e.message).slice(0,140) + ")" : ""));
 }
 const N_EXAMPLE = `{"fiber":0,"sugar":1.1,"satfat":4.2,"sodium":340,"potassium":150,"calcium":60,"iron":1.8,"magnesium":12,"zinc":1.3,"vitA":160,"vitC":0,"vitD":2.2,"vitE":1.1,"vitK":0.6,"b12":0.9,"folate":47,"omega3":0.1,"leucine":1.1,"eaa":5.6}`;
 const N_UNITS = `"n" holds that food's nutrients: fiber, sugar (total), satfat, omega3 (ALA+EPA+DHA), leucine and eaa (all 9 essential amino acids combined) in grams; sodium, potassium, calcium, iron, magnesium, zinc, vitC, vitE in mg; vitA (mcg RAE), vitD, vitK, b12 in mcg; folate in mcg DFE. Use USDA FoodData Central-style values for the portion; include supplements' label amounts if the user logged a supplement. Every key is required; use 0 when truly absent.`;
@@ -1798,7 +1798,7 @@ async function runAI(statusEl, btn, makeCall){
   if (!sample || aiOff){ statusEl.textContent = aiMsg(); statusEl.classList.add("err"); return; }
   const label = btn.textContent;
   btn.disabled = true; btn.replaceChildren(h("span",{class:"spinner","aria-hidden":"true"}), "Estimating…");
-  statusEl.classList.remove("err"); statusEl.textContent = "Claude is working it out. Usually 5–20 seconds.";
+  statusEl.classList.remove("err"); statusEl.textContent = "The AI is working it out. Usually 5–20 seconds.";
   try {
     const out = await makeCall();
     if (!out) return;
@@ -1858,7 +1858,7 @@ $("#photoGo").addEventListener("click", async () => {
   runAI($("#photoStatus"), $("#photoGo"), async () => {
     $("#photoStatus").textContent = "Preparing your photo…";
     const jpg = await toJpeg(photoFile);
-    $("#photoStatus").textContent = "Claude is looking at your meal. Usually 5–20 seconds.";
+    $("#photoStatus").textContent = "The AI is looking at your meal. Usually 5–20 seconds.";
     const res = await sample.json(
 `The attached image is a photo of a meal someone ate, for their fitness food log.
 Identify each food and estimate its portion from visual cues (plate size, utensils, hands, packaging). Then estimate nutrition with USDA-style values, accounting for visible oils, sauces and toppings.${note ? `\nThe user adds: """${note.slice(0,500)}"""` : ""}
@@ -2698,7 +2698,7 @@ function toCard(r, used, missing, soonKeys){
 }
 function runOffline(badge){
   $("#kplan").replaceChildren();
-  if (K.mode !== "meals"){ setHead(badge, false); kShowStatus(aiMode ? "Press Feed me and Claude will build the plan." : "Meal plans need Claude. Switch back to “3 meal ideas” for the built-in recipe book."); $("#cards").replaceChildren(); return; }
+  if (K.mode !== "meals"){ setHead(badge, false); kShowStatus(aiMode ? "Press Feed me and the AI will build the plan." : "Meal plans need the AI. Switch back to “3 meal ideas” for the built-in recipe book."); $("#cards").replaceChildren(); return; }
   const cards = matchOffline();
   setHead(badge, false);
   if (!cards.length){ kShowStatus("Nothing in the recipe book fits that combo. Add a staple like eggs, rice or bread, or turn on more equipment."); $("#cards").replaceChildren(); return; }
@@ -2854,9 +2854,9 @@ Recipe shape: ${RECIPE_SHAPE}`;
 const KERR = {
   rate_limited:"Too many requests right now. Wait a minute and try again.",
   session_expired:"Your Claude session expired. Sign in again, then retry.",
-  refused:"Claude wouldn't answer that one. Try changing the ingredients or notes.",
-  invalid_json:"Claude's answer came back garbled. Press the button to try again.",
-  empty_completion:"Claude came back empty. Try again with fewer notes.",
+  refused:"The AI wouldn't answer that one. Try changing the ingredients or notes.",
+  invalid_json:"The AI's answer came back garbled. Press the button to try again.",
+  empty_completion:"The AI came back empty. Try again with fewer notes.",
   prompt_too_large:"That's a lot of text. Trim your notes and try again.",
   image_rejected:"That photo didn't work. Try a smaller or clearer one.",
   images_unavailable:"Photos aren't supported on this device. Type the ingredients instead."
@@ -2870,7 +2870,7 @@ function handleErr(e){
   const code = e && e.code;
   if (code === "cancelled") { kHideStatus(); return; }
   if (PERMANENT.includes(code)) { aiOff = true; aiReason = (code==="not_granted"||code==="sampling_disabled"||code==="no_backend"||code==="no_key") ? code : "other"; goOffline(); runOffline("Recipe book"); kShowStatus(aiMsg() + " Until then, these come from the built-in recipe book."); return; }
-  kShowStatus(KERR[code] || "Couldn't reach Claude. Press the button to try again.", true);
+  kShowStatus(KERR[code] || ("Couldn't reach the AI. Press the button to try again." + (e && e.message ? " (" + String(e.message).slice(0,140) + ")" : "")), true);
 }
 async function askClaude(avoid){
   if (!K.ings.length){ kShowStatus("Add at least one ingredient first.", true); return; }
@@ -2884,7 +2884,7 @@ async function askClaude(avoid){
     const list = (res && Array.isArray(res.recipes) ? res.recipes : Array.isArray(res) ? res : []).filter(r => r && r.title);
     if (!list.length) throw {code:"invalid_json"};
     lastTitles = list.map(r => r.title);
-    kHideStatus(); setHead("Made by Claude", true);
+    kHideStatus(); setHead("Made by AI", true);
     kRenderPlan(res && res.plan);
     renderCards(list, {plain: K.mode !== "meals"});
     addMoreButton();
@@ -2930,8 +2930,8 @@ function goOffline(){
 function kAIReady(){
   if (!sample || aiOff) return goOffline();
   aiMode = true; canImage = imgOK;
-  $("#mode-dot").className = "k-dot on"; $("#k-mode-text").textContent = "Claude-powered";
-  if ($("#r-badge").textContent === "Example") $("#r-badge").textContent = "Quick match · press Feed me for Claude's picks";
+  $("#mode-dot").className = "k-dot on"; $("#k-mode-text").textContent = "AI-powered";
+  if ($("#r-badge").textContent === "Example") $("#r-badge").textContent = "Quick match · press Feed me for AI picks";
   $("#photo-btn").hidden = !canImage;
   renderControls();
 }
@@ -4307,7 +4307,7 @@ function boot(){
   $("#loading").hidden = true;
   if (!S.profile || !S.profile.setup){ /* first run: kitchen goal follows default plan */ }
   fillPlanForm();
-  renderControls(); runOffline(aiMode ? "Quick match · press Feed me for Claude's picks" : "Example");
+  renderControls(); runOffline(aiMode ? "Quick match · press Feed me for AI picks" : "Example");
   let v = "today"; try { v = localStorage.getItem("chomp:view") || "today"; } catch(e){}
   if (!(S.profile && S.profile.setup)) v = "plan";
   setView(["today","kitchen","nutrients","lift","progress","sleep","drinks","journal","cal","plan"].includes(v) ? v : "today");
